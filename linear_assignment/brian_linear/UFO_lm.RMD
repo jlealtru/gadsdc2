@@ -1,0 +1,68 @@
+setwd('C:\\Users\\bfrickert\\Documents\\GitHub\\gadsdc2\\linear_assignment\\brian_linear')
+ufo_model <- read.csv('ufo_model.tsv', sep='\t')
+
+ufo_lm <- subset(ufo_model, MilitaryDist < 100)
+
+linear.fit <- lm(MilitaryDist ~ SwampDist #+ GolfDist + HospitalDist 
+                 + MeterologicalDist #+ StorDist
+                 , data=ufo_lm)
+rmse <- function(x, y) {
+  return(sqrt(mean((x-y)^2)))
+}
+rmse(ufo_lm$MilitaryDist, predict(linear.fit))
+summary(linear.fit) # .99 Adjusted R-squared score!!
+
+plot(MilitaryDist ~ SwampDist #+ GolfDist + HospitalDist 
+     + MeterologicalDist #+ StorDist
+     , data=ufo_lm)
+abline(linear.fit, col="red") # This red line is kind of confusing! Why is it declining?
+
+plot(MilitaryDist - predict(linear.fit) ~ MilitaryDist, data=ufo_lm)
+
+plot(linear.fit, 1) # the first available diagnostic plot
+
+plot(ufo_lm[,c(10:18)], pch=19, col=ufo_model$MilitaryDist)
+round(cor(ufo_lm[,c(10:18)])^2, 2)
+
+head(model.matrix(MilitaryDist ~ SwampDist #+ GolfDist + HospitalDist 
+                  + MeterologicalDist #+ StorDist
+                  , data=ufo_lm))
+
+The log-fit doesn't do anything for me. R-squared score of .37!
+ggplot(ufo_lm, aes(y=log(MilitaryDist), x=log(SwampDist #+ GolfDist + HospitalDist 
+                                                 + MeterologicalDist #+ StorDist
+                                                 ))) + geom_point()
+log.fit <- lm(log(MilitaryDist) ~ log(SwampDist #+ GolfDist + HospitalDist 
+                                      + MeterologicalDist #+ StorDist
+                                      ), data=ufo_lm)
+summary(log.fit)
+
+library(glmnet)
+ufo_model2<-ufo_lm[complete.cases(ufo_lm),]
+x=model.matrix(MilitaryDist ~ SwampDist #+ GolfDist + HospitalDist 
+               + MeterologicalDist #+ StorDist
+               , data=ufo_lm) 
+y=ufo_model2$MilitaryDist
+
+fit.ridge=glmnet(x, y, alpha=0)
+plot(fit.ridge, xvar="lambda", label=TRUE)
+
+
+set.seed(102)
+cv.ridge=cv.glmnet(x, y, alpha=1, nfolds=10)
+plot(cv.ridge)
+
+fit.lasso=glmnet(x, y)
+plot(fit.lasso, xvar="lambda", label=TRUE)
+
+set.seed(42)
+cv.lasso=cv.glmnet(x, y, nfolds=10)
+plot(cv.lasso)
+coef(cv.lasso)
+
+
+
+cv.lasso$lambda.min
+#predict(cv.fit,newx=x[1:5,],s=c(0.001,0.002)
+head(predict(cv.lasso,x ,s=cv.lasso$lambda.1se))
+rmse(ufo_model$MilitaryDist, predict(cv.lasso,x ,s=cv.lasso$lambda.1se))
